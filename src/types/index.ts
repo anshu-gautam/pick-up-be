@@ -13,6 +13,10 @@ export interface Gradient {
   accessibilityScore?: number;
   tags?: string[];
   isPublic?: boolean;
+  conversationId?: string;
+  messageId?: string;
+  previewUrl?: string;
+  storagePath?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -116,4 +120,41 @@ export interface PaginatedResponse<T> {
     total: number;
     totalPages: number;
   };
+}
+
+// Conversation and Message types for chat-based gradient generation
+export interface Conversation {
+  id?: string;
+  userId: string;
+  title?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export interface Message {
+  id?: string;
+  conversationId: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  suggestedGradients?: Gradient[];
+  createdAt?: Date;
+}
+
+export interface ConversationWithMessages {
+  conversation: Conversation;
+  messages: Message[];
+}
+
+export interface CreateConversationRequest {
+  title?: string;
+}
+
+export interface SendMessageRequest {
+  content: string;
+  conversationId?: string;
+}
+
+export interface SendMessageResponse {
+  message: Message;
+  conversation: Conversation;
 }

@@ -5,11 +5,13 @@ import accessibilityRoutes from './accessibility.routes';
 import exportRoutes from './export.routes';
 import userRoutes from './user.routes';
 import analyticsRoutes from './analytics.routes';
+import conversationRoutes from './conversation.routes';
 
 const router = Router();
 
 router.use('/generate', generateRoutes);
 router.use('/gradients', gradientRoutes);
+router.use('/conversations', conversationRoutes);
 router.use('/validate/accessibility', accessibilityRoutes);
 router.use('/export', exportRoutes);
 router.use('/users', userRoutes);
