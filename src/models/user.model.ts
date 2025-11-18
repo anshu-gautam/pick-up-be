@@ -1,42 +1,46 @@
-import { supabase } from '../config/database';
+import { prisma } from '../config/prisma';
 import { UserProfile, UserStats } from '../types';
 import { logger } from '../config/logger';
+import { Prisma } from '@prisma/client';
 
 export class UserModel {
   static async findByClerkId(clerkId: string): Promise<UserProfile | null> {
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('clerk_id', clerkId)
-        .single();
+      const user = await prisma.user.findUnique({
+        where: { clerkId },
+      });
 
-      if (error) {
-        if (error.code === 'PGRST116') return null;
-        throw error;
-      }
-
-      return this.mapToUserProfile(data);
+      return user ? this.mapToUserProfile(user) : null;
     } catch (error) {
       logger.error('Error finding user by Clerk ID:', error);
       throw error;
     }
   }
 
+  static async findById(id: string): Promise<UserProfile | null> {
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id },
+      });
+
+      return user ? this.mapToUserProfile(user) : null;
+    } catch (error) {
+      logger.error('Error finding user by ID:', error);
+      throw error;
+    }
+  }
+
   static async create(clerkId: string, email: string, name?: string): Promise<UserProfile> {
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .insert({
-          clerk_id: clerkId,
+      const user = await prisma.user.create({
+        data: {
+          clerkId,
           email,
           name,
-        })
-        .select()
-        .single();
+        },
+      });
 
-      if (error) throw error;
-      return this.mapToUserProfile(data);
+      return this.mapToUserProfile(user);
     } catch (error) {
       logger.error('Error creating user:', error);
       throw error;
@@ -48,20 +52,20 @@ export class UserModel {
     updates: Partial<UserProfile>
   ): Promise<UserProfile> {
     try {
-      const updateData: any = {};
+      const updateData: Prisma.UserUpdateInput = {};
+
       if (updates.name !== undefined) updateData.name = updates.name;
       if (updates.email !== undefined) updateData.email = updates.email;
-      if (updates.preferences !== undefined) updateData.preferences = updates.preferences;
+      if (updates.preferences !== undefined) {
+        updateData.preferences = updates.preferences as Prisma.InputJsonValue;
+      }
 
-      const { data, error } = await supabase
-        .from('users')
-        .update(updateData)
-        .eq('clerk_id', clerkId)
-        .select()
-        .single();
+      const user = await prisma.user.update({
+        where: { clerkId },
+        data: updateData,
+      });
 
-      if (error) throw error;
-      return this.mapToUserProfile(data);
+      return this.mapToUserProfile(user);
     } catch (error) {
       logger.error('Error updating user profile:', error);
       throw error;
@@ -70,28 +74,22 @@ export class UserModel {
 
   static async getStats(userId: string): Promise<UserStats> {
     try {
-      const [userResult, gradientsResult, favoritesResult] = await Promise.all([
-        supabase.from('users').select('*').eq('id', userId).single(),
-        supabase
-          .from('gradients')
-          .select('id, is_public', { count: 'exact' })
-          .eq('user_id', userId),
-        supabase.from('favorites').select('id', { count: 'exact' }).eq('user_id', userId),
+      const [user, totalGradients, publicGradients, favoriteGradients] = await Promise.all([
+        prisma.user.findUnique({ where: { id: userId } }),
+        prisma.gradient.count({ where: { userId } }),
+        prisma.gradient.count({ where: { userId, isPublic: true } }),
+        prisma.favorite.count({ where: { userId } }),
       ]);
 
-      if (userResult.error) throw userResult.error;
-
-      const user = userResult.data;
-      const totalGradients = gradientsResult.count || 0;
-      const publicGradients =
-        gradientsResult.data?.filter((g) => g.is_public).length || 0;
-      const favoriteGradients = favoritesResult.count || 0;
+      if (!user) {
+        throw new Error('User not found');
+      }
 
       return {
         totalGradients,
         publicGradients,
-        generationsUsed: user.generations_used || 0,
-        generationsLimit: user.generations_limit || 100,
+        generationsUsed: user.generationsUsed,
+        generationsLimit: user.generationsLimit,
         favoriteGradients,
       };
     } catch (error) {
@@ -102,8 +100,12 @@ export class UserModel {
 
   static async incrementGenerations(userId: string): Promise<void> {
     try {
-      const { error } = await supabase.rpc('increment_generations', { user_id: userId });
-      if (error) throw error;
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          generationsUsed: { increment: 1 },
+        },
+      });
     } catch (error) {
       logger.error('Error incrementing generations:', error);
       throw error;
@@ -115,8 +117,8 @@ export class UserModel {
       id: data.id,
       email: data.email,
       name: data.name,
-      createdAt: new Date(data.created_at),
-      preferences: data.preferences,
+      createdAt: data.createdAt,
+      preferences: data.preferences as UserProfile['preferences'],
     };
   }
 }

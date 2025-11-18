@@ -1,0 +1,132 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id              String    @id @default(uuid()) @db.Uuid
+  clerkId         String    @unique @map("clerk_id") @db.VarChar(255)
+  email           String    @unique @db.VarChar(255)
+  name            String?   @db.VarChar(255)
+  preferences     Json?     @default("{}")
+  generationsUsed Int       @default(0) @map("generations_used")
+  generationsLimit Int      @default(100) @map("generations_limit")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  gradients       Gradient[]
+  conversations   Conversation[]
+  favorites       Favorite[]
+  analyticsEvents AnalyticsEvent[]
+
+  @@map("users")
+}
+
+model Gradient {
+  id                 String    @id @default(uuid()) @db.Uuid
+  userId             String?   @map("user_id") @db.Uuid
+  name               String    @db.VarChar(255)
+  type               String    @db.VarChar(50)
+  angle              Int?
+  colorStops         Json      @map("color_stops")
+  accessibilityScore Decimal?  @map("accessibility_score") @db.Decimal(5, 2)
+  tags               String[]
+  isPublic           Boolean   @default(false) @map("is_public")
+  conversationId     String?   @map("conversation_id") @db.Uuid
+  messageId          String?   @map("message_id") @db.Uuid
+  previewUrl         String?   @map("preview_url")
+  storagePath        String?   @map("storage_path")
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  user              User?           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversation      Conversation?   @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  message           Message?        @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  analyticsEvents   AnalyticsEvent[]
+  favorites         Favorite[]
+
+  @@index([userId])
+  @@index([isPublic])
+  @@index([createdAt(sort: Desc)])
+  @@index([conversationId])
+  @@index([messageId])
+  @@map("gradients")
+}
+
+model Conversation {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  title     String?   @db.VarChar(500)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  Message[]
+  gradients Gradient[]
+
+  @@index([userId])
+  @@index([updatedAt(sort: Desc)])
+  @@map("conversations")
+}
+
+model Message {
+  id                  String    @id @default(uuid()) @db.Uuid
+  conversationId      String    @map("conversation_id") @db.Uuid
+  role                String    @db.VarChar(20)
+  content             String
+  suggestedGradients  Json?     @map("suggested_gradients")
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  gradients    Gradient[]
+
+  @@index([conversationId])
+  @@index([createdAt(sort: Asc)])
+  @@map("messages")
+}
+
+model AnalyticsEvent {
+  id         String   @id @default(uuid()) @db.Uuid
+  eventType  String   @map("event_type") @db.VarChar(50)
+  gradientId String?  @map("gradient_id") @db.Uuid
+  userId     String?  @map("user_id") @db.Uuid
+  metadata   Json?
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  gradient Gradient? @relation(fields: [gradientId], references: [id], onDelete: SetNull)
+  user     User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([eventType])
+  @@index([gradientId])
+  @@index([createdAt(sort: Desc)])
+  @@map("analytics_events")
+}
+
+model Favorite {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  gradientId String   @map("gradient_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gradient Gradient @relation(fields: [gradientId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, gradientId])
+  @@index([userId])
+  @@index([gradientId])
+  @@map("favorites")
+}

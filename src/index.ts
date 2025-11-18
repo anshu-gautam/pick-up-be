@@ -1,14 +1,14 @@
 import { createApp } from './app';
 import { env } from './config/env';
 import { logger } from './config/logger';
-import { initializeDatabase } from './config/database';
+import { connectDatabase, disconnectDatabase } from './config/prisma';
 import { redis, closeRedis } from './config/redis';
 
 const startServer = async () => {
   try {
     logger.info('Starting server initialization...');
 
-    await initializeDatabase();
+    await connectDatabase();
 
     const app = createApp();
 
@@ -25,10 +25,11 @@ const startServer = async () => {
         logger.info('HTTP server closed');
 
         try {
+          await disconnectDatabase();
           await closeRedis();
           logger.info('Redis connection closed');
         } catch (error) {
-          logger.error('Error closing Redis connection:', error);
+          logger.error('Error closing connections:', error);
         }
 
         logger.info('Graceful shutdown completed');

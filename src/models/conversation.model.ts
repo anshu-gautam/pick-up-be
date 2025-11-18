@@ -1,6 +1,7 @@
-import { supabase } from '../config/database';
-import { Conversation, Message, ConversationWithMessages, PaginationParams, PaginatedResponse } from '../types';
+import { prisma } from '../config/prisma';
+import { Conversation, Message, ConversationWithMessages, PaginationParams, PaginatedResponse, Gradient } from '../types';
 import { logger } from '../config/logger';
+import { Prisma } from '@prisma/client';
 
 export class ConversationModel {
   /**
@@ -8,18 +9,14 @@ export class ConversationModel {
    */
   static async create(userId: string, title?: string): Promise<Conversation> {
     try {
-      const { data, error } = await supabase
-        .from('conversations')
-        .insert({
-          user_id: userId,
+      const conversation = await prisma.conversation.create({
+        data: {
+          userId,
           title: title || null,
-        })
-        .select()
-        .single();
+        },
+      });
 
-      if (error) throw error;
-
-      return this.mapToConversation(data);
+      return this.mapToConversation(conversation);
     } catch (error) {
       logger.error('Error creating conversation:', error);
       throw error;
@@ -31,19 +28,11 @@ export class ConversationModel {
    */
   static async findById(id: string, userId: string): Promise<Conversation | null> {
     try {
-      const { data, error } = await supabase
-        .from('conversations')
-        .select('*')
-        .eq('id', id)
-        .eq('user_id', userId)
-        .single();
+      const conversation = await prisma.conversation.findFirst({
+        where: { id, userId },
+      });
 
-      if (error) {
-        if (error.code === 'PGRST116') return null;
-        throw error;
-      }
-
-      return this.mapToConversation(data);
+      return conversation ? this.mapToConversation(conversation) : null;
     } catch (error) {
       logger.error('Error finding conversation:', error);
       throw error;
@@ -60,26 +49,22 @@ export class ConversationModel {
     try {
       const page = params.page || 1;
       const limit = params.limit || 20;
-      const offset = (page - 1) * limit;
-      const sortBy = params.sortBy || 'updated_at';
+      const skip = (page - 1) * limit;
+      const sortBy = params.sortBy || 'updatedAt';
       const sortOrder = params.sortOrder || 'desc';
 
-      const query = supabase
-        .from('conversations')
-        .select('*', { count: 'exact' })
-        .eq('user_id', userId)
-        .order(sortBy, { ascending: sortOrder === 'asc' })
-        .range(offset, offset + limit - 1);
-
-      const { data, error, count } = await query;
-
-      if (error) throw error;
-
-      const conversations = (data || []).map(this.mapToConversation);
-      const total = count || 0;
+      const [conversations, total] = await Promise.all([
+        prisma.conversation.findMany({
+          where: { userId },
+          orderBy: { [sortBy]: sortOrder },
+          skip,
+          take: limit,
+        }),
+        prisma.conversation.count({ where: { userId } }),
+      ]);
 
       return {
-        data: conversations,
+        data: conversations.map(this.mapToConversation),
         pagination: {
           page,
           limit,
@@ -98,24 +83,20 @@ export class ConversationModel {
    */
   static async getWithMessages(id: string, userId: string): Promise<ConversationWithMessages | null> {
     try {
-      // Get conversation
-      const conversation = await this.findById(id, userId);
+      const conversation = await prisma.conversation.findFirst({
+        where: { id, userId },
+        include: {
+          messages: {
+            orderBy: { createdAt: 'asc' },
+          },
+        },
+      });
+
       if (!conversation) return null;
 
-      // Get messages
-      const { data: messagesData, error } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('conversation_id', id)
-        .order('created_at', { ascending: true });
-
-      if (error) throw error;
-
-      const messages = (messagesData || []).map(MessageModel.mapToMessage);
-
       return {
-        conversation,
-        messages,
+        conversation: this.mapToConversation(conversation),
+        messages: conversation.messages.map(MessageModel.mapToMessage),
       };
     } catch (error) {
       logger.error('Error getting conversation with messages:', error);
@@ -128,17 +109,12 @@ export class ConversationModel {
    */
   static async updateTitle(id: string, userId: string, title: string): Promise<Conversation> {
     try {
-      const { data, error } = await supabase
-        .from('conversations')
-        .update({ title })
-        .eq('id', id)
-        .eq('user_id', userId)
-        .select()
-        .single();
+      const conversation = await prisma.conversation.update({
+        where: { id, userId },
+        data: { title },
+      });
 
-      if (error) throw error;
-
-      return this.mapToConversation(data);
+      return this.mapToConversation(conversation);
     } catch (error) {
       logger.error('Error updating conversation:', error);
       throw error;
@@ -150,14 +126,9 @@ export class ConversationModel {
    */
   static async delete(id: string, userId: string): Promise<boolean> {
     try {
-      const { error } = await supabase
-        .from('conversations')
-        .delete()
-        .eq('id', id)
-        .eq('user_id', userId);
-
-      if (error) throw error;
-
+      await prisma.conversation.delete({
+        where: { id, userId },
+      });
       return true;
     } catch (error) {
       logger.error('Error deleting conversation:', error);
@@ -171,10 +142,10 @@ export class ConversationModel {
   private static mapToConversation(data: any): Conversation {
     return {
       id: data.id,
-      userId: data.user_id,
+      userId: data.userId,
       title: data.title,
-      createdAt: new Date(data.created_at),
-      updatedAt: new Date(data.updated_at),
+      createdAt: data.createdAt,
+      updatedAt: data.updatedAt,
     };
   }
 }
@@ -190,20 +161,44 @@ export class MessageModel {
     suggestedGradients?: any[]
   ): Promise<Message> {
     try {
-      const { data, error } = await supabase
-        .from('messages')
-        .insert({
-          conversation_id: conversationId,
+      const message = await prisma.message.create({
+        data: {
+          conversationId,
           role,
           content,
-          suggested_gradients: suggestedGradients || null,
-        })
-        .select()
-        .single();
+          suggestedGradients: suggestedGradients
+            ? (suggestedGradients as Prisma.InputJsonValue)
+            : undefined,
+        },
+      });
 
-      if (error) throw error;
+      // Update conversation's updatedAt
+      await prisma.conversation.update({
+        where: { id: conversationId },
+        data: { updatedAt: new Date() },
+      });
 
-      return this.mapToMessage(data);
+      // Auto-generate title if first user message
+      if (role === 'user') {
+        const messageCount = await prisma.message.count({
+          where: { conversationId },
+        });
+
+        if (messageCount === 1) {
+          const conversation = await prisma.conversation.findUnique({
+            where: { id: conversationId },
+          });
+
+          if (conversation && !conversation.title) {
+            await prisma.conversation.update({
+              where: { id: conversationId },
+              data: { title: content.substring(0, 100) },
+            });
+          }
+        }
+      }
+
+      return this.mapToMessage(message);
     } catch (error) {
       logger.error('Error creating message:', error);
       throw error;
@@ -215,15 +210,12 @@ export class MessageModel {
    */
   static async findByConversationId(conversationId: string): Promise<Message[]> {
     try {
-      const { data, error } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('conversation_id', conversationId)
-        .order('created_at', { ascending: true });
+      const messages = await prisma.message.findMany({
+        where: { conversationId },
+        orderBy: { createdAt: 'asc' },
+      });
 
-      if (error) throw error;
-
-      return (data || []).map(this.mapToMessage);
+      return messages.map(this.mapToMessage);
     } catch (error) {
       logger.error('Error finding messages:', error);
       throw error;
@@ -235,14 +227,9 @@ export class MessageModel {
    */
   static async getMessageCount(conversationId: string): Promise<number> {
     try {
-      const { count, error } = await supabase
-        .from('messages')
-        .select('*', { count: 'exact', head: true })
-        .eq('conversation_id', conversationId);
-
-      if (error) throw error;
-
-      return count || 0;
+      return await prisma.message.count({
+        where: { conversationId },
+      });
     } catch (error) {
       logger.error('Error getting message count:', error);
       throw error;
@@ -254,13 +241,9 @@ export class MessageModel {
    */
   static async deleteByConversationId(conversationId: string): Promise<boolean> {
     try {
-      const { error } = await supabase
-        .from('messages')
-        .delete()
-        .eq('conversation_id', conversationId);
-
-      if (error) throw error;
-
+      await prisma.message.deleteMany({
+        where: { conversationId },
+      });
       return true;
     } catch (error) {
       logger.error('Error deleting messages:', error);
@@ -274,11 +257,11 @@ export class MessageModel {
   static mapToMessage(data: any): Message {
     return {
       id: data.id,
-      conversationId: data.conversation_id,
-      role: data.role,
+      conversationId: data.conversationId,
+      role: data.role as 'user' | 'assistant' | 'system',
       content: data.content,
-      suggestedGradients: data.suggested_gradients,
-      createdAt: new Date(data.created_at),
+      suggestedGradients: data.suggestedGradients as Gradient[] | undefined,
+      createdAt: data.createdAt,
     };
   }
 }

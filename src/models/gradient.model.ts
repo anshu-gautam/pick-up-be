@@ -1,26 +1,28 @@
-import { supabase } from '../config/database';
-import { Gradient, PaginationParams, PaginatedResponse } from '../types';
+import { prisma } from '../config/prisma';
+import { Gradient, PaginationParams, PaginatedResponse, ColorStop } from '../types';
 import { logger } from '../config/logger';
+import { Prisma } from '@prisma/client';
 
 export class GradientModel {
   static async create(gradient: Gradient): Promise<Gradient> {
     try {
-      const { data, error } = await supabase
-        .from('gradients')
-        .insert({
-          user_id: gradient.userId,
+      const data = await prisma.gradient.create({
+        data: {
+          userId: gradient.userId,
           name: gradient.name,
           type: gradient.type,
           angle: gradient.angle,
-          color_stops: gradient.colorStops,
-          accessibility_score: gradient.accessibilityScore,
-          tags: gradient.tags,
-          is_public: gradient.isPublic || false,
-        })
-        .select()
-        .single();
+          colorStops: gradient.colorStops as unknown as Prisma.InputJsonValue,
+          accessibilityScore: gradient.accessibilityScore,
+          tags: gradient.tags || [],
+          isPublic: gradient.isPublic || false,
+          conversationId: gradient.conversationId,
+          messageId: gradient.messageId,
+          previewUrl: gradient.previewUrl,
+          storagePath: gradient.storagePath,
+        },
+      });
 
-      if (error) throw error;
       return this.mapToGradient(data);
     } catch (error) {
       logger.error('Error creating gradient:', error);
@@ -30,22 +32,16 @@ export class GradientModel {
 
   static async findById(id: string, userId?: string): Promise<Gradient | null> {
     try {
-      let query = supabase.from('gradients').select('*').eq('id', id);
+      const gradient = await prisma.gradient.findFirst({
+        where: {
+          id,
+          OR: userId
+            ? [{ userId }, { isPublic: true }]
+            : [{ isPublic: true }],
+        },
+      });
 
-      if (userId) {
-        query = query.or(`user_id.eq.${userId},is_public.eq.true`);
-      } else {
-        query = query.eq('is_public', true);
-      }
-
-      const { data, error } = await query.single();
-
-      if (error) {
-        if (error.code === 'PGRST116') return null;
-        throw error;
-      }
-
-      return this.mapToGradient(data);
+      return gradient ? this.mapToGradient(gradient) : null;
     } catch (error) {
       logger.error('Error finding gradient:', error);
       throw error;
@@ -59,26 +55,22 @@ export class GradientModel {
     try {
       const page = params.page || 1;
       const limit = params.limit || 10;
-      const offset = (page - 1) * limit;
-      const sortBy = params.sortBy || 'created_at';
+      const skip = (page - 1) * limit;
+      const sortBy = params.sortBy || 'createdAt';
       const sortOrder = params.sortOrder || 'desc';
 
-      const query = supabase
-        .from('gradients')
-        .select('*', { count: 'exact' })
-        .eq('user_id', userId)
-        .order(sortBy, { ascending: sortOrder === 'asc' })
-        .range(offset, offset + limit - 1);
-
-      const { data, error, count } = await query;
-
-      if (error) throw error;
-
-      const gradients = (data || []).map(this.mapToGradient);
-      const total = count || 0;
+      const [gradients, total] = await Promise.all([
+        prisma.gradient.findMany({
+          where: { userId },
+          orderBy: { [sortBy]: sortOrder },
+          skip,
+          take: limit,
+        }),
+        prisma.gradient.count({ where: { userId } }),
+      ]);
 
       return {
-        data: gradients,
+        data: gradients.map(this.mapToGradient),
         pagination: {
           page,
           limit,
@@ -98,26 +90,22 @@ export class GradientModel {
     try {
       const page = params.page || 1;
       const limit = params.limit || 20;
-      const offset = (page - 1) * limit;
-      const sortBy = params.sortBy || 'created_at';
+      const skip = (page - 1) * limit;
+      const sortBy = params.sortBy || 'createdAt';
       const sortOrder = params.sortOrder || 'desc';
 
-      const query = supabase
-        .from('gradients')
-        .select('*', { count: 'exact' })
-        .eq('is_public', true)
-        .order(sortBy, { ascending: sortOrder === 'asc' })
-        .range(offset, offset + limit - 1);
-
-      const { data, error, count } = await query;
-
-      if (error) throw error;
-
-      const gradients = (data || []).map(this.mapToGradient);
-      const total = count || 0;
+      const [gradients, total] = await Promise.all([
+        prisma.gradient.findMany({
+          where: { isPublic: true },
+          orderBy: { [sortBy]: sortOrder },
+          skip,
+          take: limit,
+        }),
+        prisma.gradient.count({ where: { isPublic: true } }),
+      ]);
 
       return {
-        data: gradients,
+        data: gradients.map(this.mapToGradient),
         pagination: {
           page,
           limit,
@@ -133,25 +121,27 @@ export class GradientModel {
 
   static async update(id: string, userId: string, updates: Partial<Gradient>): Promise<Gradient> {
     try {
-      const updateData: any = {};
+      const updateData: Prisma.GradientUpdateInput = {};
+
       if (updates.name !== undefined) updateData.name = updates.name;
       if (updates.type !== undefined) updateData.type = updates.type;
       if (updates.angle !== undefined) updateData.angle = updates.angle;
-      if (updates.colorStops !== undefined) updateData.color_stops = updates.colorStops;
-      if (updates.accessibilityScore !== undefined)
-        updateData.accessibility_score = updates.accessibilityScore;
+      if (updates.colorStops !== undefined) {
+        updateData.colorStops = updates.colorStops as unknown as Prisma.InputJsonValue;
+      }
+      if (updates.accessibilityScore !== undefined) {
+        updateData.accessibilityScore = updates.accessibilityScore;
+      }
       if (updates.tags !== undefined) updateData.tags = updates.tags;
-      if (updates.isPublic !== undefined) updateData.is_public = updates.isPublic;
+      if (updates.isPublic !== undefined) updateData.isPublic = updates.isPublic;
+      if (updates.previewUrl !== undefined) updateData.previewUrl = updates.previewUrl;
+      if (updates.storagePath !== undefined) updateData.storagePath = updates.storagePath;
 
-      const { data, error } = await supabase
-        .from('gradients')
-        .update(updateData)
-        .eq('id', id)
-        .eq('user_id', userId)
-        .select()
-        .single();
+      const data = await prisma.gradient.update({
+        where: { id, userId },
+        data: updateData,
+      });
 
-      if (error) throw error;
       return this.mapToGradient(data);
     } catch (error) {
       logger.error('Error updating gradient:', error);
@@ -161,13 +151,9 @@ export class GradientModel {
 
   static async delete(id: string, userId: string): Promise<boolean> {
     try {
-      const { error } = await supabase
-        .from('gradients')
-        .delete()
-        .eq('id', id)
-        .eq('user_id', userId);
-
-      if (error) throw error;
+      await prisma.gradient.delete({
+        where: { id, userId },
+      });
       return true;
     } catch (error) {
       logger.error('Error deleting gradient:', error);
@@ -178,16 +164,20 @@ export class GradientModel {
   private static mapToGradient(data: any): Gradient {
     return {
       id: data.id,
-      userId: data.user_id,
+      userId: data.userId,
       name: data.name,
-      type: data.type,
+      type: data.type as 'linear' | 'radial' | 'conic',
       angle: data.angle,
-      colorStops: data.color_stops,
-      accessibilityScore: data.accessibility_score,
+      colorStops: data.colorStops as ColorStop[],
+      accessibilityScore: data.accessibilityScore ? Number(data.accessibilityScore) : undefined,
       tags: data.tags,
-      isPublic: data.is_public,
-      createdAt: new Date(data.created_at),
-      updatedAt: new Date(data.updated_at),
+      isPublic: data.isPublic,
+      conversationId: data.conversationId,
+      messageId: data.messageId,
+      previewUrl: data.previewUrl,
+      storagePath: data.storagePath,
+      createdAt: data.createdAt,
+      updatedAt: data.updatedAt,
     };
   }
 }
