@@ -3,30 +3,32 @@ import { env } from '../config/env';
 import { Gradient, ColorStop } from '../types';
 import { logger } from '../config/logger';
 import { generateAnalogousColors, generateTriadicColors } from '../utils/colorUtils';
+import { getDirectOpenAIClient, getGoogleAIClient } from '../config/ai-provider';
 
-const openai = new OpenAI({
-  apiKey: env.OPENAI_API_KEY,
-});
+// Get the appropriate client based on provider
+const openaiClient = getDirectOpenAIClient();
+const googleClient = getGoogleAIClient();
 
 export class AIService {
-  static async generateGradients(prompt: string, count: number = 3): Promise<Gradient[]> {
-    try {
-      const systemPrompt = `You are an expert gradient designer with deep knowledge of color theory, design principles, and accessibility.
+  private static getSystemPrompt(count: number): string {
+    return `You are an expert gradient designer with deep knowledge of color theory, design principles, and accessibility.
 Your task is to generate beautiful, harmonious gradients based on user descriptions.
 
-Return a JSON array of gradient objects with this exact structure:
-[
-  {
-    "name": "Gradient name (creative and descriptive)",
-    "type": "linear" | "radial" | "conic",
-    "angle": 45-360 (for linear gradients),
-    "colorStops": [
-      {"color": "#HEXCODE", "position": 0-100},
-      {"color": "#HEXCODE", "position": 0-100}
-    ],
-    "tags": ["tag1", "tag2"]
-  }
-]
+Return a JSON object with a "gradients" array containing gradient objects with this exact structure:
+{
+  "gradients": [
+    {
+      "name": "Gradient name (creative and descriptive)",
+      "type": "linear" | "radial" | "conic",
+      "angle": 45-360 (for linear gradients),
+      "colorStops": [
+        {"color": "#HEXCODE", "position": 0-100},
+        {"color": "#HEXCODE", "position": 0-100}
+      ],
+      "tags": ["tag1", "tag2"]
+    }
+  ]
+}
 
 Guidelines:
 - Create ${count} unique gradient variations
@@ -37,54 +39,117 @@ Guidelines:
 - Add descriptive tags related to mood, theme, or use case
 - Avoid extreme contrast that might cause accessibility issues
 - Return ONLY valid JSON, no additional text`;
+  }
 
-      const completion = await openai.chat.completions.create({
-        model: 'gpt-4-turbo-preview',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: prompt },
-        ],
-        temperature: 0.8,
-        response_format: { type: 'json_object' },
-      });
+  static async generateGradients(prompt: string, count: number = 3): Promise<Gradient[]> {
+    try {
+      const systemPrompt = this.getSystemPrompt(count);
+      let content: string | null = null;
 
-      const content = completion.choices[0].message.content;
+      // Use appropriate client based on provider
+      if (env.AI_PROVIDER === 'google' && googleClient) {
+        content = await this.generateWithGoogle(systemPrompt, prompt);
+      } else if (openaiClient) {
+        content = await this.generateWithOpenAI(openaiClient, systemPrompt, prompt);
+      } else {
+        throw new Error('No AI client available');
+      }
+
       if (!content) {
-        throw new Error('No content received from OpenAI');
+        throw new Error('No content received from AI');
       }
 
-      let parsedResponse;
-      try {
-        parsedResponse = JSON.parse(content);
-      } catch (parseError) {
-        logger.error('Failed to parse OpenAI response:', content);
-        throw new Error('Invalid JSON response from AI');
-      }
-
-      const gradients = parsedResponse.gradients || [parsedResponse];
-
-      const validGradients = gradients
-        .filter((g: any) => g.colorStops && g.colorStops.length >= 2)
-        .map((g: any) => ({
-          name: g.name || 'AI Generated Gradient',
-          type: g.type || 'linear',
-          angle: g.angle || 90,
-          colorStops: g.colorStops.sort((a: ColorStop, b: ColorStop) => a.position - b.position),
-          tags: g.tags || ['ai-generated'],
-          isPublic: false,
-        }))
-        .slice(0, count);
-
-      if (validGradients.length === 0) {
-        return this.generateFallbackGradients(prompt, count);
-      }
-
-      logger.info(`Generated ${validGradients.length} gradients for prompt: "${prompt}"`);
-      return validGradients;
+      return this.parseGradientResponse(content, prompt, count);
     } catch (error) {
       logger.error('Error generating gradients with AI:', error);
       return this.generateFallbackGradients(prompt, count);
     }
+  }
+
+  private static async generateWithOpenAI(
+    client: OpenAI,
+    systemPrompt: string,
+    userPrompt: string
+  ): Promise<string | null> {
+    const completion = await client.chat.completions.create({
+      model: env.AI_MODEL,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      temperature: 0.8,
+      response_format: { type: 'json_object' },
+    });
+
+    return completion.choices[0].message.content;
+  }
+
+  private static async generateWithGoogle(
+    systemPrompt: string,
+    userPrompt: string
+  ): Promise<string | null> {
+    if (!googleClient) {
+      throw new Error('Google AI client not initialized');
+    }
+
+    const model = googleClient.getGenerativeModel({
+      model: env.AI_MODEL,
+      generationConfig: {
+        temperature: 0.8,
+        responseMimeType: 'application/json',
+      },
+    });
+
+    const chat = model.startChat({
+      history: [
+        {
+          role: 'user',
+          parts: [{ text: systemPrompt }],
+        },
+        {
+          role: 'model',
+          parts: [{ text: 'I understand. I will generate gradients in the specified JSON format.' }],
+        },
+      ],
+    });
+
+    const result = await chat.sendMessage(userPrompt);
+    return result.response.text();
+  }
+
+  private static parseGradientResponse(
+    content: string,
+    prompt: string,
+    count: number
+  ): Gradient[] {
+    let parsedResponse;
+    try {
+      parsedResponse = JSON.parse(content);
+    } catch (parseError) {
+      logger.error('Failed to parse AI response:', content);
+      throw new Error('Invalid JSON response from AI');
+    }
+
+    const gradients = parsedResponse.gradients || [parsedResponse];
+
+    const validGradients = gradients
+      .filter((g: any) => g.colorStops && g.colorStops.length >= 2)
+      .map((g: any) => ({
+        name: g.name || 'AI Generated Gradient',
+        type: g.type || 'linear',
+        angle: g.angle || 90,
+        colorStops: g.colorStops.sort((a: ColorStop, b: ColorStop) => a.position - b.position),
+        tags: g.tags || ['ai-generated'],
+        isPublic: false,
+      }))
+      .slice(0, count);
+
+    if (validGradients.length === 0) {
+      return this.generateFallbackGradients(prompt, count);
+    }
+
+    logger.info(`Generated ${validGradients.length} gradients for prompt: "${prompt}" using ${env.AI_PROVIDER}`);
+    return validGradients;
   }
 
   private static generateFallbackGradients(_prompt: string, count: number): Gradient[] {
@@ -115,27 +180,47 @@ Guidelines:
 
   static async enhanceGradient(gradient: Gradient): Promise<Gradient> {
     try {
-      const prompt = `Enhance this gradient to make it more visually appealing while maintaining its general character:
+      const systemPrompt = 'You are a gradient enhancement expert. Improve gradients while preserving their essence. Return a JSON object with colorStops array and optional angle.';
+      const userPrompt = `Enhance this gradient to make it more visually appealing while maintaining its general character:
 Type: ${gradient.type}
 Current colors: ${gradient.colorStops.map((cs) => cs.color).join(', ')}
 
 Suggest improvements to color harmony, positioning, or additional color stops.
-Return the enhanced gradient in the same JSON format.`;
+Return the enhanced gradient in the same JSON format with colorStops and angle.`;
 
-      const completion = await openai.chat.completions.create({
-        model: 'gpt-4-turbo-preview',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a gradient enhancement expert. Improve gradients while preserving their essence.',
+      let content: string | null = null;
+
+      if (env.AI_PROVIDER === 'google' && googleClient) {
+        const model = googleClient.getGenerativeModel({
+          model: env.AI_MODEL,
+          generationConfig: {
+            temperature: 0.7,
+            responseMimeType: 'application/json',
           },
-          { role: 'user', content: prompt },
-        ],
-        temperature: 0.7,
-        response_format: { type: 'json_object' },
-      });
+        });
 
-      const content = completion.choices[0].message.content;
+        const chat = model.startChat({
+          history: [
+            { role: 'user', parts: [{ text: systemPrompt }] },
+            { role: 'model', parts: [{ text: 'I understand. I will enhance the gradient and return JSON.' }] },
+          ],
+        });
+
+        const result = await chat.sendMessage(userPrompt);
+        content = result.response.text();
+      } else if (openaiClient) {
+        const completion = await openaiClient.chat.completions.create({
+          model: env.AI_MODEL,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+          temperature: 0.7,
+          response_format: { type: 'json_object' },
+        });
+        content = completion.choices[0].message.content;
+      }
+
       if (!content) {
         return gradient;
       }

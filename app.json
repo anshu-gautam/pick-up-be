@@ -32,12 +32,24 @@
       "description": "Supabase service role key",
       "required": true
     },
+    "AI_PROVIDER": {
+      "description": "AI provider to use (openai, openrouter, or google)",
+      "value": "openai"
+    },
     "OPENAI_API_KEY": {
-      "description": "OpenAI API key for gradient generation",
-      "required": true
+      "description": "OpenAI API key (required if AI_PROVIDER=openai)",
+      "required": false
+    },
+    "OPENROUTER_API_KEY": {
+      "description": "OpenRouter API key (required if AI_PROVIDER=openrouter). Get at https://openrouter.ai",
+      "required": false
+    },
+    "GOOGLE_API_KEY": {
+      "description": "Google/Gemini API key (required if AI_PROVIDER=google). Get at https://makersuite.google.com",
+      "required": false
     },
     "AI_MODEL": {
-      "description": "OpenAI model to use",
+      "description": "AI model to use. Examples: gpt-4-turbo-preview, google/gemini-2.0-flash-exp:free, gemini-1.5-pro",
       "value": "gpt-4-turbo-preview"
     },
     "CLERK_SECRET_KEY": {

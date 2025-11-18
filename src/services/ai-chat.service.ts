@@ -1,12 +1,11 @@
-import { openai } from '@ai-sdk/openai';
 import { generateText, generateObject, streamText, CoreMessage } from 'ai';
-import { env } from '../config/env';
 import { Gradient, Message } from '../types';
 import { logger } from '../config/logger';
 import { AccessibilityService } from './accessibility.service';
 import { StorageService } from './storage.service';
 import { ExportService } from './export.service';
 import { z } from 'zod';
+import { getVercelAIModel } from '../config/ai-provider';
 
 const gradientSchema = z.object({
   gradients: z.array(
@@ -26,7 +25,9 @@ const gradientSchema = z.object({
 });
 
 export class AIChatService {
-  private static model = openai(env.AI_MODEL);
+  private static getModel() {
+    return getVercelAIModel();
+  }
 
   private static systemPrompt = `You are an expert gradient designer with deep knowledge of color theory, design principles, and accessibility.
 Your role is to help users create beautiful, harmonious gradients through conversation.
@@ -60,7 +61,7 @@ Respond naturally to user messages and use the generateGradients tool when they 
       ];
 
       const { text, toolResults } = await generateText({
-        model: this.model,
+        model: this.getModel(),
         messages,
         tools: {
           generateGradients: {
@@ -137,7 +138,7 @@ Respond naturally to user messages and use the generateGradients tool when they 
       ];
 
       const result = await streamText({
-        model: this.model,
+        model: this.getModel(),
         messages,
         maxTokens: 1000,
         temperature: 0.8,
@@ -162,7 +163,7 @@ Respond naturally to user messages and use the generateGradients tool when they 
   ): Promise<Gradient[]> {
     try {
       const { object } = await generateObject({
-        model: this.model,
+        model: this.getModel(),
         messages: [
           {
             role: 'system',
