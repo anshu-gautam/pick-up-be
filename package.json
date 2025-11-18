@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "description": "Express API for AI Gradient Generation",
   "main": "dist/index.js",
+  "engines": {
+    "node": "18.x",
+    "npm": "9.x"
+  },
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "prisma generate && tsc",
@@ -15,7 +19,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:push": "prisma db push",
     "prisma:studio": "prisma studio",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "heroku-postbuild": "npm run build"
   },
   "keywords": [
     "express",

@@ -1,0 +1,84 @@
+{
+  "name": "gradient-generation-api",
+  "description": "Express API for AI-powered gradient generation",
+  "repository": "https://github.com/yourusername/pick-up-be",
+  "keywords": ["express", "typescript", "gradient", "ai", "api"],
+  "env": {
+    "NODE_ENV": {
+      "description": "Environment mode",
+      "value": "production"
+    },
+    "PORT": {
+      "description": "Port to run the server",
+      "value": "3000"
+    },
+    "DATABASE_URL": {
+      "description": "PostgreSQL connection URL (Supabase)",
+      "required": true
+    },
+    "DIRECT_URL": {
+      "description": "Direct PostgreSQL connection URL for migrations",
+      "required": true
+    },
+    "SUPABASE_URL": {
+      "description": "Supabase project URL",
+      "required": true
+    },
+    "SUPABASE_ANON_KEY": {
+      "description": "Supabase anonymous key",
+      "required": true
+    },
+    "SUPABASE_SERVICE_KEY": {
+      "description": "Supabase service role key",
+      "required": true
+    },
+    "OPENAI_API_KEY": {
+      "description": "OpenAI API key for gradient generation",
+      "required": true
+    },
+    "AI_MODEL": {
+      "description": "OpenAI model to use",
+      "value": "gpt-4-turbo-preview"
+    },
+    "CLERK_SECRET_KEY": {
+      "description": "Clerk secret key for authentication",
+      "required": true
+    },
+    "CLERK_PUBLISHABLE_KEY": {
+      "description": "Clerk publishable key",
+      "required": true
+    },
+    "REDIS_URL": {
+      "description": "Redis connection URL for rate limiting",
+      "required": true
+    },
+    "CORS_ORIGIN": {
+      "description": "Allowed CORS origins (comma-separated)",
+      "value": "*"
+    },
+    "RATE_LIMIT_WINDOW_MS": {
+      "description": "Rate limit window in milliseconds",
+      "value": "900000"
+    },
+    "RATE_LIMIT_MAX_REQUESTS": {
+      "description": "Maximum requests per window",
+      "value": "100"
+    }
+  },
+  "addons": [
+    {
+      "plan": "heroku-redis:mini"
+    }
+  ],
+  "buildpacks": [
+    {
+      "url": "heroku/nodejs"
+    }
+  ],
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "basic"
+    }
+  }
+}
