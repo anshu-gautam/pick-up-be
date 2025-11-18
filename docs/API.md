@@ -24,6 +24,384 @@ Authorization: Bearer <your-clerk-jwt-token>
 
 ---
 
+## Clerk Setup Guide
+
+This API uses [Clerk](https://clerk.com) for authentication. Clerk handles all user management on the frontend, and this API verifies the JWT tokens.
+
+### 1. Create a Clerk Application
+
+1. Sign up at [clerk.com](https://clerk.com)
+2. Create a new application
+3. Choose your sign-in methods (Email, Google, GitHub, etc.)
+4. Get your API keys from the dashboard
+
+### 2. Get Your API Keys
+
+From your Clerk Dashboard, you'll need:
+
+| Key | Location | Used For |
+|-----|----------|----------|
+| `CLERK_PUBLISHABLE_KEY` | API Keys page | Frontend SDK |
+| `CLERK_SECRET_KEY` | API Keys page | Backend verification |
+
+### 3. Frontend Setup (React/Next.js)
+
+#### Install Clerk
+
+```bash
+npm install @clerk/nextjs
+# or
+npm install @clerk/clerk-react
+```
+
+#### Configure Environment Variables
+
+```env
+# .env.local
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
+CLERK_SECRET_KEY=sk_test_...
+```
+
+#### Wrap Your App with ClerkProvider
+
+**Next.js (app/layout.tsx)**:
+```tsx
+import { ClerkProvider } from '@clerk/nextjs'
+
+export default function RootLayout({ children }) {
+  return (
+    <ClerkProvider>
+      <html lang="en">
+        <body>{children}</body>
+      </html>
+    </ClerkProvider>
+  )
+}
+```
+
+**React (main.tsx)**:
+```tsx
+import { ClerkProvider } from '@clerk/clerk-react'
+
+const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
+    <App />
+  </ClerkProvider>
+)
+```
+
+#### Add Sign In/Sign Up Components
+
+```tsx
+import { SignIn, SignUp, UserButton } from '@clerk/nextjs'
+
+// Sign In Page
+export default function SignInPage() {
+  return <SignIn />
+}
+
+// Sign Up Page
+export default function SignUpPage() {
+  return <SignUp />
+}
+
+// User Button (shows user menu when signed in)
+export default function Header() {
+  return (
+    <header>
+      <UserButton afterSignOutUrl="/" />
+    </header>
+  )
+}
+```
+
+### 4. Making Authenticated API Requests
+
+#### Using useAuth Hook
+
+```tsx
+import { useAuth } from '@clerk/nextjs'
+
+function GradientGenerator() {
+  const { getToken, isSignedIn } = useAuth()
+
+  const generateGradient = async () => {
+    if (!isSignedIn) {
+      // Redirect to sign in
+      return
+    }
+
+    // Get the JWT token from Clerk
+    const token = await getToken()
+
+    const response = await fetch('http://localhost:3000/api/generate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        prompt: 'Create a sunset gradient',
+        count: 3,
+      }),
+    })
+
+    const data = await response.json()
+    console.log(data.gradients)
+  }
+
+  return (
+    <button onClick={generateGradient}>
+      Generate Gradient
+    </button>
+  )
+}
+```
+
+#### Creating an API Client
+
+```typescript
+// lib/api.ts
+import { useAuth } from '@clerk/nextjs'
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api'
+
+export function useApiClient() {
+  const { getToken } = useAuth()
+
+  const fetchWithAuth = async (endpoint: string, options: RequestInit = {}) => {
+    const token = await getToken()
+
+    const response = await fetch(`${API_BASE}${endpoint}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { 'Authorization': `Bearer ${token}` }),
+        ...options.headers,
+      },
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.error || 'API request failed')
+    }
+
+    return response.json()
+  }
+
+  return {
+    // Generate gradients
+    generate: (prompt: string, count?: number) =>
+      fetchWithAuth('/generate', {
+        method: 'POST',
+        body: JSON.stringify({ prompt, count }),
+      }),
+
+    // Get user's gradients
+    getGradients: (page = 1, limit = 10) =>
+      fetchWithAuth(`/gradients?page=${page}&limit=${limit}`),
+
+    // Get single gradient
+    getGradient: (id: string) =>
+      fetchWithAuth(`/gradients/${id}`),
+
+    // Save gradient
+    saveGradient: (gradient: any) =>
+      fetchWithAuth('/gradients', {
+        method: 'POST',
+        body: JSON.stringify(gradient),
+      }),
+
+    // Delete gradient
+    deleteGradient: (id: string) =>
+      fetchWithAuth(`/gradients/${id}`, { method: 'DELETE' }),
+
+    // Send chat message
+    sendMessage: (content: string, conversationId?: string) =>
+      fetchWithAuth('/conversations/messages', {
+        method: 'POST',
+        body: JSON.stringify({ content, conversationId }),
+      }),
+
+    // Get conversations
+    getConversations: () =>
+      fetchWithAuth('/conversations'),
+
+    // Get user profile
+    getProfile: () =>
+      fetchWithAuth('/users/profile'),
+
+    // Get user stats
+    getStats: () =>
+      fetchWithAuth('/users/stats'),
+
+    // Export as CSS
+    exportCSS: (gradient: any) =>
+      fetchWithAuth('/export/css', {
+        method: 'POST',
+        body: JSON.stringify({ gradient }),
+      }),
+
+    // Validate accessibility
+    validateAccessibility: (gradient: any, foregroundColor: string) =>
+      fetchWithAuth('/validate/accessibility', {
+        method: 'POST',
+        body: JSON.stringify({ gradient, foregroundColor }),
+      }),
+  }
+}
+```
+
+#### Usage Example
+
+```tsx
+import { useApiClient } from '@/lib/api'
+
+function MyComponent() {
+  const api = useApiClient()
+  const [gradients, setGradients] = useState([])
+
+  useEffect(() => {
+    const loadGradients = async () => {
+      try {
+        const data = await api.getGradients()
+        setGradients(data.data)
+      } catch (error) {
+        console.error('Failed to load gradients:', error)
+      }
+    }
+
+    loadGradients()
+  }, [])
+
+  const handleGenerate = async () => {
+    const result = await api.generate('ocean sunset colors', 3)
+    setGradients(prev => [...result.gradients, ...prev])
+  }
+
+  return (
+    <div>
+      <button onClick={handleGenerate}>Generate</button>
+      {gradients.map(g => <GradientCard key={g.id} gradient={g} />)}
+    </div>
+  )
+}
+```
+
+### 5. Backend Environment Variables
+
+Set these in your backend `.env` file:
+
+```env
+# Clerk (required for auth)
+CLERK_SECRET_KEY=sk_test_...
+CLERK_PUBLISHABLE_KEY=pk_test_...
+```
+
+### 6. Protecting Routes in Frontend
+
+**Next.js Middleware (middleware.ts)**:
+```typescript
+import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
+
+const isPublicRoute = createRouteMatcher([
+  '/',
+  '/sign-in(.*)',
+  '/sign-up(.*)',
+  '/gallery(.*)',
+])
+
+export default clerkMiddleware((auth, request) => {
+  if (!isPublicRoute(request)) {
+    auth().protect()
+  }
+})
+
+export const config = {
+  matcher: ['/((?!.*\\..*|_next).*)', '/', '/(api|trpc)(.*)'],
+}
+```
+
+**Protect Specific Pages**:
+```tsx
+import { auth } from '@clerk/nextjs/server'
+import { redirect } from 'next/navigation'
+
+export default async function DashboardPage() {
+  const { userId } = await auth()
+
+  if (!userId) {
+    redirect('/sign-in')
+  }
+
+  return <Dashboard />
+}
+```
+
+### 7. Authentication Flow
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│   Frontend  │     │    Clerk    │     │   Backend   │
+└──────┬──────┘     └──────┬──────┘     └──────┬──────┘
+       │                   │                   │
+       │ 1. Sign In        │                   │
+       │──────────────────>│                   │
+       │                   │                   │
+       │ 2. JWT Token      │                   │
+       │<──────────────────│                   │
+       │                   │                   │
+       │ 3. API Request with Bearer Token      │
+       │──────────────────────────────────────>│
+       │                   │                   │
+       │                   │ 4. Verify Token   │
+       │                   │<──────────────────│
+       │                   │                   │
+       │                   │ 5. Token Valid    │
+       │                   │──────────────────>│
+       │                   │                   │
+       │ 6. API Response                       │
+       │<──────────────────────────────────────│
+       │                   │                   │
+```
+
+### 8. Handling Auth Errors
+
+```tsx
+import { useAuth } from '@clerk/nextjs'
+import { useRouter } from 'next/navigation'
+
+function ProtectedComponent() {
+  const { isSignedIn, isLoaded } = useAuth()
+  const router = useRouter()
+
+  // Wait for Clerk to load
+  if (!isLoaded) {
+    return <LoadingSpinner />
+  }
+
+  // Redirect if not signed in
+  if (!isSignedIn) {
+    router.push('/sign-in')
+    return null
+  }
+
+  return <YourComponent />
+}
+```
+
+### 9. Clerk Webhooks (Optional)
+
+To sync user data when users sign up/update in Clerk:
+
+1. Go to Clerk Dashboard > Webhooks
+2. Add endpoint: `https://your-api.com/api/webhooks/clerk`
+3. Select events: `user.created`, `user.updated`, `user.deleted`
+
+---
+
 ## Table of Contents
 
 1. [Health Check](#health-check)
