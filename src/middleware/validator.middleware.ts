@@ -20,10 +20,11 @@ export const validate =
 
         logger.warn('Validation error:', { errors, path: req.path });
 
-        return res.status(400).json({
+        res.status(400).json({
           error: 'Validation failed',
           details: errors,
         });
+        return;
       }
       next(error);
     }

@@ -87,7 +87,7 @@ Guidelines:
     }
   }
 
-  private static generateFallbackGradients(prompt: string, count: number): Gradient[] {
+  private static generateFallbackGradients(_prompt: string, count: number): Gradient[] {
     const baseColors = ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#43e97b'];
     const gradients: Gradient[] = [];
 

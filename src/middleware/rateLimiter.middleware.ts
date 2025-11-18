@@ -10,7 +10,9 @@ export const createRateLimiter = (windowMs?: number, max?: number) => {
     standardHeaders: true,
     legacyHeaders: false,
     store: new RedisStore({
-      sendCommand: (...args: string[]) => redis.call(...args),
+      sendCommand: async (...args: string[]) => {
+        return redis.call(args[0], ...args.slice(1)) as any;
+      },
     }),
     message: 'Too many requests from this IP, please try again later.',
   });

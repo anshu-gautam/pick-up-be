@@ -1,5 +1,5 @@
 import { openai } from '@ai-sdk/openai';
-import { generateText, streamText, CoreMessage } from 'ai';
+import { generateText, generateObject, streamText, CoreMessage } from 'ai';
 import { env } from '../config/env';
 import { Gradient, Message } from '../types';
 import { logger } from '../config/logger';
@@ -59,7 +59,7 @@ Respond naturally to user messages and use the generateGradients tool when they 
         { role: 'user', content: userPrompt },
       ];
 
-      const { text, toolCalls } = await generateText({
+      const { text, toolResults } = await generateText({
         model: this.model,
         messages,
         tools: {
@@ -88,13 +88,13 @@ Respond naturally to user messages and use the generateGradients tool when they 
         temperature: 0.8,
       });
 
-      // Extract gradients from tool calls or fallback
+      // Extract gradients from tool results or fallback
       let gradients: Gradient[] = [];
 
-      if (toolCalls && toolCalls.length > 0) {
-        for (const toolCall of toolCalls) {
-          if (toolCall.toolName === 'generateGradients' && toolCall.result) {
-            const result = toolCall.result as any;
+      if (toolResults && toolResults.length > 0) {
+        for (const toolResult of toolResults) {
+          if (toolResult.toolName === 'generateGradients' && toolResult.result) {
+            const result = toolResult.result as any;
             gradients = result.gradients || [];
           }
         }
@@ -161,7 +161,7 @@ Respond naturally to user messages and use the generateGradients tool when they 
     userId: string
   ): Promise<Gradient[]> {
     try {
-      const { object } = await generateText({
+      const { object } = await generateObject({
         model: this.model,
         messages: [
           {
@@ -180,7 +180,7 @@ Respond naturally to user messages and use the generateGradients tool when they 
         maxTokens: 2000,
       });
 
-      const gradients = object.gradients.map((g: any) => ({
+      const gradients = object.gradients.map((g) => ({
         ...g,
         isPublic: false,
       }));
@@ -222,7 +222,7 @@ Respond naturally to user messages and use the generateGradients tool when they 
    * Generate fallback gradients if AI fails
    */
   private static async generateFallbackGradients(
-    prompt: string,
+    _prompt: string,
     count: number,
     userId: string
   ): Promise<Gradient[]> {

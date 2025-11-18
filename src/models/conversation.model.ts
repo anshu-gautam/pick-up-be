@@ -1,7 +1,6 @@
 import { prisma } from '../config/prisma';
-import { Conversation, Message, ConversationWithMessages, PaginationParams, PaginatedResponse, Gradient } from '../types';
+import { Conversation, Message, ConversationWithMessages, PaginationParams, PaginatedResponse, Gradient, PrismaTypes } from '../types';
 import { logger } from '../config/logger';
-import { Prisma } from '@prisma/client';
 
 export class ConversationModel {
   /**
@@ -167,7 +166,7 @@ export class MessageModel {
           role,
           content,
           suggestedGradients: suggestedGradients
-            ? (suggestedGradients as Prisma.InputJsonValue)
+            ? (suggestedGradients as PrismaTypes.InputJsonValue)
             : undefined,
         },
       });

@@ -1,7 +1,6 @@
 import { prisma } from '../config/prisma';
-import { Gradient, PaginationParams, PaginatedResponse, ColorStop } from '../types';
+import { Gradient, PaginationParams, PaginatedResponse, ColorStop, PrismaTypes } from '../types';
 import { logger } from '../config/logger';
-import { Prisma } from '@prisma/client';
 
 export class GradientModel {
   static async create(gradient: Gradient): Promise<Gradient> {
@@ -12,7 +11,7 @@ export class GradientModel {
           name: gradient.name,
           type: gradient.type,
           angle: gradient.angle,
-          colorStops: gradient.colorStops as unknown as Prisma.InputJsonValue,
+          colorStops: gradient.colorStops as unknown as PrismaTypes.InputJsonValue,
           accessibilityScore: gradient.accessibilityScore,
           tags: gradient.tags || [],
           isPublic: gradient.isPublic || false,
@@ -121,13 +120,13 @@ export class GradientModel {
 
   static async update(id: string, userId: string, updates: Partial<Gradient>): Promise<Gradient> {
     try {
-      const updateData: Prisma.GradientUpdateInput = {};
+      const updateData: PrismaTypes.GradientUpdateInput = {};
 
       if (updates.name !== undefined) updateData.name = updates.name;
       if (updates.type !== undefined) updateData.type = updates.type;
       if (updates.angle !== undefined) updateData.angle = updates.angle;
       if (updates.colorStops !== undefined) {
-        updateData.colorStops = updates.colorStops as unknown as Prisma.InputJsonValue;
+        updateData.colorStops = updates.colorStops as unknown as PrismaTypes.InputJsonValue;
       }
       if (updates.accessibilityScore !== undefined) {
         updateData.accessibilityScore = updates.accessibilityScore;

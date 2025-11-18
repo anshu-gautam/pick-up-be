@@ -47,8 +47,8 @@ export class AnalyticsModel {
       }
 
       const gradientIds = eventCounts
-        .map((e) => e.gradientId)
-        .filter((id): id is string => id !== null);
+        .map((e: { gradientId: string | null }) => e.gradientId)
+        .filter((id: string | null): id is string => id !== null);
 
       // Get the actual gradients
       const gradients = await prisma.gradient.findMany({
@@ -130,7 +130,7 @@ export class AnalyticsModel {
         take: limit,
       });
 
-      return gradients.map((g) => ({
+      return gradients.map((g: any) => ({
         id: g.id,
         userId: g.userId,
         name: g.name,

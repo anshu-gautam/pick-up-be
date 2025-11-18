@@ -15,7 +15,8 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'No authorization token provided' });
+      res.status(401).json({ error: 'No authorization token provided' });
+      return;
     }
 
     const token = authHeader.substring(7);
@@ -27,7 +28,8 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
 
       const clerkId = payload.sub;
       if (!clerkId) {
-        return res.status(401).json({ error: 'Invalid token payload' });
+        res.status(401).json({ error: 'Invalid token payload' });
+        return;
       }
 
       let user = await UserModel.findByClerkId(clerkId);
@@ -46,15 +48,15 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
       next();
     } catch (error) {
       logger.error('Token verification failed:', error);
-      return res.status(401).json({ error: 'Invalid or expired token' });
+      res.status(401).json({ error: 'Invalid or expired token' });
     }
   } catch (error) {
     logger.error('Authentication error:', error);
-    return res.status(500).json({ error: 'Internal authentication error' });
+    res.status(500).json({ error: 'Internal authentication error' });
   }
 };
 
-export const optionalAuth = async (req: AuthRequest, res: Response, next: NextFunction) => {
+export const optionalAuth = async (req: AuthRequest, _res: Response, next: NextFunction) => {
   try {
     const authHeader = req.headers.authorization;
 

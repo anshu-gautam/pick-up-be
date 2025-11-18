@@ -33,7 +33,7 @@ export const createApp = (): Application => {
 
   app.use('/api', routes);
 
-  app.get('/', (req, res) => {
+  app.get('/', (_req, res) => {
     res.json({
       name: 'Gradient Generation API',
       version: '1.0.0',

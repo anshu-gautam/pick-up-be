@@ -2,7 +2,8 @@ import Color from 'color';
 
 export const hexToRgb = (hex: string): { r: number; g: number; b: number } => {
   const color = Color(hex);
-  return color.rgb().object();
+  const rgb = color.rgb().object();
+  return { r: rgb.r as number, g: rgb.g as number, b: rgb.b as number };
 };
 
 export const rgbToHex = (r: number, g: number, b: number): string => {

@@ -2,7 +2,7 @@ import { createApp } from './app';
 import { env } from './config/env';
 import { logger } from './config/logger';
 import { connectDatabase, disconnectDatabase } from './config/prisma';
-import { redis, closeRedis } from './config/redis';
+import { closeRedis } from './config/redis';
 
 const startServer = async () => {
   try {

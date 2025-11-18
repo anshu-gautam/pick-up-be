@@ -158,3 +158,35 @@ export interface SendMessageResponse {
   message: Message;
   conversation: Conversation;
 }
+
+// Prisma-compatible type definitions for when Prisma client cannot be generated
+// These match the Prisma-generated types and can be used as fallbacks
+export namespace PrismaTypes {
+  export type InputJsonValue =
+    | string
+    | number
+    | boolean
+    | null
+    | { [key: string]: InputJsonValue }
+    | InputJsonValue[];
+
+  export interface GradientUpdateInput {
+    name?: string;
+    type?: string;
+    angle?: number | null;
+    colorStops?: InputJsonValue;
+    accessibilityScore?: number | null;
+    tags?: string[];
+    isPublic?: boolean;
+    previewUrl?: string | null;
+    storagePath?: string | null;
+    updatedAt?: Date;
+  }
+
+  export interface UserUpdateInput {
+    name?: string | null;
+    email?: string;
+    preferences?: InputJsonValue | null;
+    updatedAt?: Date;
+  }
+}

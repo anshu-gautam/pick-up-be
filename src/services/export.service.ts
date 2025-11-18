@@ -33,9 +33,6 @@ export class ExportService {
 
   static generateTailwind(gradient: Gradient): string {
     try {
-      const firstColor = gradient.colorStops[0].color;
-      const lastColor = gradient.colorStops[gradient.colorStops.length - 1].color;
-
       const directionMap: Record<number, string> = {
         0: 'to-t',
         45: 'to-tr',
