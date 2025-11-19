@@ -71,6 +71,71 @@ export interface ExportImageRequest {
   format: 'png' | 'svg';
 }
 
+// Hero Image Generation Types
+export type HeroImageStyle =
+  | 'abstract'
+  | 'gradient-art'
+  | 'illustration'
+  | 'landscape'
+  | 'product'
+  | 'minimal'
+  | 'geometric'
+  | 'tech'
+  | 'nature'
+  | 'business';
+
+export interface GenerateHeroImageRequest {
+  prompt: string;
+  style?: HeroImageStyle;
+  includeText?: string;
+  mood?: string;
+  colorScheme?: string;
+}
+
+export interface GenerateHeroImageVariationsRequest {
+  prompt: string;
+  style?: HeroImageStyle;
+  includeText?: string;
+  mood?: string;
+  colorScheme?: string;
+  count?: number;
+}
+
+export interface EditImageRequest {
+  imageUrl: string;
+  editPrompt: string;
+}
+
+export interface GeneratedImage {
+  imageUrl: string;
+  storagePath: string;
+  prompt: string;
+  style: HeroImageStyle;
+  mimeType: string;
+  generatedAt: Date;
+}
+
+export interface GenerateHeroImageResponse {
+  image: GeneratedImage;
+  metadata: {
+    generatedAt: Date;
+    style: HeroImageStyle;
+  };
+}
+
+export interface GenerateHeroImageVariationsResponse {
+  images: GeneratedImage[];
+  metadata: {
+    generatedAt: Date;
+    count: number;
+  };
+}
+
+export interface HeroImageStyleInfo {
+  style: HeroImageStyle;
+  description: string;
+}
+
 export interface UserProfile {
   id: string;
   email: string;

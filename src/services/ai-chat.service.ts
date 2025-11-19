@@ -66,15 +66,15 @@ Respond naturally to user messages and use the generateGradients tool when they 
           generateGradients: {
             description:
               'Generate gradient designs based on user requirements. Use this when user wants to create gradients.',
-            parameters: z.object({
+            inputSchema: z.object({
               count: z.number().min(1).max(5).describe('Number of gradients to generate'),
               theme: z.string().describe('Theme or mood for the gradients'),
               colors: z
                 .array(z.string())
                 .optional()
                 .describe('Specific colors to include if mentioned'),
-            }),
-            execute: async ({ count, theme }) => {
+            }) as any,
+            execute: async ({ count, theme }: { count: number; theme: string }) => {
               const generatedGradients = await this.generateGradientsFromTheme(
                 theme,
                 count,
@@ -84,7 +84,7 @@ Respond naturally to user messages and use the generateGradients tool when they 
             },
           },
         },
-        maxTokens: 1000,
+        maxOutputTokens: 1000,
         temperature: 0.8,
       });
 
@@ -93,8 +93,8 @@ Respond naturally to user messages and use the generateGradients tool when they 
 
       if (toolResults && toolResults.length > 0) {
         for (const toolResult of toolResults) {
-          if (toolResult.toolName === 'generateGradients' && toolResult.result) {
-            const result = toolResult.result as any;
+          if (toolResult.toolName === 'generateGradients' && 'output' in toolResult) {
+            const result = toolResult.output as { gradients: Gradient[] };
             gradients = result.gradients || [];
           }
         }
@@ -139,7 +139,7 @@ Respond naturally to user messages and use the generateGradients tool when they 
       const result = await streamText({
         model: this.model,
         messages,
-        maxTokens: 1000,
+        maxOutputTokens: 1000,
         temperature: 0.8,
       });
 
@@ -176,11 +176,17 @@ Respond naturally to user messages and use the generateGradients tool when they 
             colorStops (array of {color: "#HEXCODE", position: 0-100}), and tags (array of strings).`,
           },
         ],
-        schema: gradientSchema,
-        maxTokens: 2000,
+        schema: gradientSchema as any,
+        maxOutputTokens: 2000,
       });
 
-      const gradients = object.gradients.map((g) => ({
+      const gradients = object.gradients.map((g: {
+        name: string;
+        type: 'linear' | 'radial' | 'conic';
+        angle?: number;
+        colorStops: Array<{ color: string; position: number }>;
+        tags?: string[];
+      }) => ({
         ...g,
         isPublic: false,
       }));
