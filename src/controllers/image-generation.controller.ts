@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { ImageGenerationService } from '../services/image-generation.service';
+import { GeneratedImageModel } from '../models/generated-image.model';
 import { UserModel } from '../models/user.model';
 import { AnalyticsModel } from '../models/analytics.model';
 import { logger } from '../config/logger';
@@ -237,6 +238,125 @@ export class ImageGenerationController {
       });
     } catch (error) {
       logger.error('Error in getAvailableStyles controller:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get user's generated images (paginated)
+   * GET /api/images
+   */
+  static async getUserImages(req: AuthRequest, res: Response) {
+    try {
+      const userId = req.userId;
+
+      if (!userId) {
+        throw new AppError('User not authenticated', 401);
+      }
+
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 20;
+      const style = req.query.style as string | undefined;
+
+      logger.info(`Fetching images for user ${userId}, page ${page}, limit ${limit}`);
+
+      let images;
+      let total;
+
+      if (style) {
+        images = await GeneratedImageModel.findByStyle(userId, style, page, limit);
+        total = await GeneratedImageModel.countByUserId(userId);
+      } else {
+        images = await GeneratedImageModel.findByUserId(userId, page, limit);
+        total = await GeneratedImageModel.countByUserId(userId);
+      }
+
+      const totalPages = Math.ceil(total / limit);
+
+      res.json({
+        data: images,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages,
+        },
+      });
+    } catch (error) {
+      logger.error('Error in getUserImages controller:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get a specific generated image by ID
+   * GET /api/images/:id
+   */
+  static async getImageById(req: AuthRequest, res: Response) {
+    try {
+      const userId = req.userId;
+      const imageId = req.params.id;
+
+      if (!userId) {
+        throw new AppError('User not authenticated', 401);
+      }
+
+      logger.info(`Fetching image ${imageId} for user ${userId}`);
+
+      const image = await GeneratedImageModel.findById(imageId, userId);
+
+      if (!image) {
+        throw new AppError('Image not found', 404);
+      }
+
+      res.json({ image });
+    } catch (error) {
+      logger.error('Error in getImageById controller:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete a generated image
+   * DELETE /api/images/:id
+   */
+  static async deleteImage(req: AuthRequest, res: Response) {
+    try {
+      const userId = req.userId;
+      const imageId = req.params.id;
+
+      if (!userId) {
+        throw new AppError('User not authenticated', 401);
+      }
+
+      logger.info(`Deleting image ${imageId} for user ${userId}`);
+
+      // First check if image exists and belongs to user
+      const image = await GeneratedImageModel.findById(imageId, userId);
+
+      if (!image) {
+        throw new AppError('Image not found', 404);
+      }
+
+      await GeneratedImageModel.delete(imageId, userId);
+
+      // Track analytics
+      await AnalyticsModel.trackEvent({
+        eventType: 'generation',
+        userId,
+        metadata: {
+          type: 'image-delete',
+          imageId,
+        },
+        timestamp: new Date(),
+      });
+
+      res.json({
+        message: 'Image deleted successfully',
+        deletedImageId: imageId,
+      });
+    } catch (error) {
+      logger.error('Error in deleteImage controller:', error);
       throw error;
     }
   }

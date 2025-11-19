@@ -107,11 +107,16 @@ export interface EditImageRequest {
 }
 
 export interface GeneratedImage {
+  id?: string;
+  userId?: string;
   imageUrl: string;
   storagePath: string;
   prompt: string;
   style: HeroImageStyle;
   mimeType: string;
+  mood?: string;
+  colorScheme?: string;
+  includeText?: string;
   generatedAt: Date;
 }
 

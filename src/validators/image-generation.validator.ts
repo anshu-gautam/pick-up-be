@@ -68,3 +68,27 @@ export const editImageSchema = z.object({
       .max(500, 'Edit prompt must be less than 500 characters'),
   }),
 });
+
+// Get user images with pagination and optional style filter
+export const getUserImagesSchema = z.object({
+  query: z.object({
+    page: z
+      .string()
+      .optional()
+      .transform((val) => (val ? parseInt(val, 10) : 1))
+      .refine((val) => val > 0, 'Page must be greater than 0'),
+    limit: z
+      .string()
+      .optional()
+      .transform((val) => (val ? parseInt(val, 10) : 20))
+      .refine((val) => val > 0 && val <= 100, 'Limit must be between 1 and 100'),
+    style: heroImageStyleSchema.optional(),
+  }),
+});
+
+// Get or delete image by ID
+export const imageIdParamSchema = z.object({
+  params: z.object({
+    id: z.string().uuid('Invalid image ID format'),
+  }),
+});
