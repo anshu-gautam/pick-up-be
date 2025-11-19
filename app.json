@@ -33,7 +33,7 @@
       "required": true
     },
     "AI_PROVIDER": {
-      "description": "AI provider to use (openai, openrouter, or google)",
+      "description": "AI provider to use (openai or openrouter)",
       "value": "openai"
     },
     "OPENAI_API_KEY": {
@@ -44,12 +44,8 @@
       "description": "OpenRouter API key (required if AI_PROVIDER=openrouter). Get at https://openrouter.ai",
       "required": false
     },
-    "GOOGLE_API_KEY": {
-      "description": "Google/Gemini API key (required if AI_PROVIDER=google). Get at https://makersuite.google.com",
-      "required": false
-    },
     "AI_MODEL": {
-      "description": "AI model to use. Examples: gpt-4-turbo-preview, google/gemini-2.0-flash-exp:free, gemini-1.5-pro",
+      "description": "AI model to use. Examples: gpt-4-turbo-preview, google/gemini-2.0-flash-exp:free",
       "value": "gpt-4-turbo-preview"
     },
     "CLERK_SECRET_KEY": {

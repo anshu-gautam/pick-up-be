@@ -1,13 +1,11 @@
-import OpenAI from 'openai';
 import { env } from '../config/env';
 import { Gradient, ColorStop } from '../types';
 import { logger } from '../config/logger';
 import { generateAnalogousColors, generateTriadicColors } from '../utils/colorUtils';
-import { getDirectOpenAIClient, getGoogleAIClient } from '../config/ai-provider';
+import { getDirectOpenAIClient } from '../config/ai-provider';
 
-// Get the appropriate client based on provider
+// Get the appropriate client based on provider (OpenAI or OpenRouter)
 const openaiClient = getDirectOpenAIClient();
-const googleClient = getGoogleAIClient();
 
 export class AIService {
   private static getSystemPrompt(count: number): string {
@@ -44,17 +42,18 @@ Guidelines:
   static async generateGradients(prompt: string, count: number = 3): Promise<Gradient[]> {
     try {
       const systemPrompt = this.getSystemPrompt(count);
-      let content: string | null = null;
 
-      // Use appropriate client based on provider
-      if (env.AI_PROVIDER === 'google' && googleClient) {
-        content = await this.generateWithGoogle(systemPrompt, prompt);
-      } else if (openaiClient) {
-        content = await this.generateWithOpenAI(openaiClient, systemPrompt, prompt);
-      } else {
-        throw new Error('No AI client available');
-      }
+      const completion = await openaiClient.chat.completions.create({
+        model: env.AI_MODEL,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: prompt },
+        ],
+        temperature: 0.8,
+        response_format: { type: 'json_object' },
+      });
 
+      const content = completion.choices[0].message.content;
       if (!content) {
         throw new Error('No content received from AI');
       }
@@ -64,57 +63,6 @@ Guidelines:
       logger.error('Error generating gradients with AI:', error);
       return this.generateFallbackGradients(prompt, count);
     }
-  }
-
-  private static async generateWithOpenAI(
-    client: OpenAI,
-    systemPrompt: string,
-    userPrompt: string
-  ): Promise<string | null> {
-    const completion = await client.chat.completions.create({
-      model: env.AI_MODEL,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
-      temperature: 0.8,
-      response_format: { type: 'json_object' },
-    });
-
-    return completion.choices[0].message.content;
-  }
-
-  private static async generateWithGoogle(
-    systemPrompt: string,
-    userPrompt: string
-  ): Promise<string | null> {
-    if (!googleClient) {
-      throw new Error('Google AI client not initialized');
-    }
-
-    const model = googleClient.getGenerativeModel({
-      model: env.AI_MODEL,
-      generationConfig: {
-        temperature: 0.8,
-        responseMimeType: 'application/json',
-      },
-    });
-
-    const chat = model.startChat({
-      history: [
-        {
-          role: 'user',
-          parts: [{ text: systemPrompt }],
-        },
-        {
-          role: 'model',
-          parts: [{ text: 'I understand. I will generate gradients in the specified JSON format.' }],
-        },
-      ],
-    });
-
-    const result = await chat.sendMessage(userPrompt);
-    return result.response.text();
   }
 
   private static parseGradientResponse(
@@ -188,39 +136,17 @@ Current colors: ${gradient.colorStops.map((cs) => cs.color).join(', ')}
 Suggest improvements to color harmony, positioning, or additional color stops.
 Return the enhanced gradient in the same JSON format with colorStops and angle.`;
 
-      let content: string | null = null;
+      const completion = await openaiClient.chat.completions.create({
+        model: env.AI_MODEL,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature: 0.7,
+        response_format: { type: 'json_object' },
+      });
 
-      if (env.AI_PROVIDER === 'google' && googleClient) {
-        const model = googleClient.getGenerativeModel({
-          model: env.AI_MODEL,
-          generationConfig: {
-            temperature: 0.7,
-            responseMimeType: 'application/json',
-          },
-        });
-
-        const chat = model.startChat({
-          history: [
-            { role: 'user', parts: [{ text: systemPrompt }] },
-            { role: 'model', parts: [{ text: 'I understand. I will enhance the gradient and return JSON.' }] },
-          ],
-        });
-
-        const result = await chat.sendMessage(userPrompt);
-        content = result.response.text();
-      } else if (openaiClient) {
-        const completion = await openaiClient.chat.completions.create({
-          model: env.AI_MODEL,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt },
-          ],
-          temperature: 0.7,
-          response_format: { type: 'json_object' },
-        });
-        content = completion.choices[0].message.content;
-      }
-
+      const content = completion.choices[0].message.content;
       if (!content) {
         return gradient;
       }

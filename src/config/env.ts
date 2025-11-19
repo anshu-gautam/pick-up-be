@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-type AIProvider = 'openai' | 'openrouter' | 'google';
+type AIProvider = 'openai' | 'openrouter';
 
 interface EnvConfig {
   NODE_ENV: string;
@@ -18,7 +18,6 @@ interface EnvConfig {
   AI_PROVIDER: AIProvider;
   OPENAI_API_KEY?: string;
   OPENROUTER_API_KEY?: string;
-  GOOGLE_API_KEY?: string;
   AI_MODEL: string;
   REDIS_URL: string;
   REDIS_PASSWORD?: string;
@@ -41,7 +40,7 @@ const getEnv = (key: string, defaultValue?: string): string => {
 // Get AI provider with validation
 const getAIProvider = (): AIProvider => {
   const provider = (process.env.AI_PROVIDER || 'openai').toLowerCase() as AIProvider;
-  const validProviders: AIProvider[] = ['openai', 'openrouter', 'google'];
+  const validProviders: AIProvider[] = ['openai', 'openrouter'];
   if (!validProviders.includes(provider)) {
     throw new Error(`Invalid AI_PROVIDER: ${provider}. Must be one of: ${validProviders.join(', ')}`);
   }
@@ -55,8 +54,6 @@ const getDefaultModel = (provider: AIProvider): string => {
       return 'gpt-4-turbo-preview';
     case 'openrouter':
       return 'google/gemini-2.0-flash-exp:free'; // Default to Gemini on OpenRouter
-    case 'google':
-      return 'gemini-1.5-pro';
     default:
       return 'gpt-4-turbo-preview';
   }
@@ -75,11 +72,6 @@ const validateAIConfig = () => {
     case 'openrouter':
       if (!process.env.OPENROUTER_API_KEY) {
         throw new Error('OPENROUTER_API_KEY is required when AI_PROVIDER is openrouter');
-      }
-      break;
-    case 'google':
-      if (!process.env.GOOGLE_API_KEY) {
-        throw new Error('GOOGLE_API_KEY is required when AI_PROVIDER is google');
       }
       break;
   }
@@ -101,7 +93,6 @@ export const env: EnvConfig = {
   AI_PROVIDER: aiProvider,
   OPENAI_API_KEY: process.env.OPENAI_API_KEY,
   OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
-  GOOGLE_API_KEY: process.env.GOOGLE_API_KEY,
   AI_MODEL: getEnv('AI_MODEL', getDefaultModel(aiProvider)),
   REDIS_URL: getEnv('REDIS_URL', 'redis://localhost:6379'),
   REDIS_PASSWORD: process.env.REDIS_PASSWORD,
