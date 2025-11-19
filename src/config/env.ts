@@ -14,6 +14,8 @@ interface EnvConfig {
   JWT_SECRET: string;
   OPENAI_API_KEY: string;
   AI_MODEL: string;
+  GOOGLE_GENERATIVE_AI_API_KEY: string;
+  GEMINI_IMAGE_MODEL: string;
   REDIS_URL: string;
   REDIS_PASSWORD?: string;
   RATE_LIMIT_WINDOW_MS: number;
@@ -42,6 +44,8 @@ export const env: EnvConfig = {
   JWT_SECRET: getEnv('JWT_SECRET'),
   OPENAI_API_KEY: getEnv('OPENAI_API_KEY'),
   AI_MODEL: getEnv('AI_MODEL', 'gpt-4-turbo-preview'),
+  GOOGLE_GENERATIVE_AI_API_KEY: getEnv('GOOGLE_GENERATIVE_AI_API_KEY', ''),
+  GEMINI_IMAGE_MODEL: getEnv('GEMINI_IMAGE_MODEL', 'gemini-2.0-flash-exp'),
   REDIS_URL: getEnv('REDIS_URL', 'redis://localhost:6379'),
   REDIS_PASSWORD: process.env.REDIS_PASSWORD,
   RATE_LIMIT_WINDOW_MS: parseInt(getEnv('RATE_LIMIT_WINDOW_MS', '900000'), 10),
