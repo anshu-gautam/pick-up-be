@@ -7,10 +7,48 @@ import {
   generateHeroImageVariationsSchema,
   generateImageWithTextSchema,
   editImageSchema,
+  getUserImagesSchema,
+  imageIdParamSchema,
 } from '../validators/image-generation.validator';
 import { strictRateLimiter } from '../middleware/rateLimiter.middleware';
 
 const router = Router();
+
+/**
+ * @route GET /api/images
+ * @desc Get user's generated images (paginated)
+ * @access Private
+ */
+router.get(
+  '/',
+  authenticate,
+  validate(getUserImagesSchema as any),
+  ImageGenerationController.getUserImages
+);
+
+/**
+ * @route GET /api/images/:id
+ * @desc Get a specific generated image by ID
+ * @access Private
+ */
+router.get(
+  '/:id',
+  authenticate,
+  validate(imageIdParamSchema as any),
+  ImageGenerationController.getImageById
+);
+
+/**
+ * @route DELETE /api/images/:id
+ * @desc Delete a generated image
+ * @access Private
+ */
+router.delete(
+  '/:id',
+  authenticate,
+  validate(imageIdParamSchema as any),
+  ImageGenerationController.deleteImage
+);
 
 /**
  * @route POST /api/images/generate

@@ -325,6 +325,118 @@ Authorization: Bearer <token>
 
 ---
 
+#### Get User's Generated Images
+
+**Endpoint**: `GET /api/images`
+
+**Authentication**: Required
+
+**Description**: Retrieve paginated list of user's generated images. Users can only view their own images.
+
+**Query Parameters**:
+- `page` (number, optional): Page number (default: 1)
+- `limit` (number, optional): Items per page (1-100, default: 20)
+- `style` (string, optional): Filter by image style
+
+**Example**:
+```
+GET /api/images?page=1&limit=20&style=tech
+```
+
+**Success Response** (200 OK):
+```json
+{
+  "data": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "userId": "user_abc123",
+      "imageUrl": "https://storage.supabase.co/v1/object/public/gradients/user123/generated-abc123.png",
+      "storagePath": "user123/generated-abc123.png",
+      "prompt": "Modern SaaS landing page",
+      "style": "tech",
+      "mimeType": "image/png",
+      "mood": "professional",
+      "colorScheme": "blue and purple",
+      "includeText": null,
+      "generatedAt": "2024-01-15T10:30:00.000Z"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 45,
+    "totalPages": 3
+  }
+}
+```
+
+**Error Responses**:
+- `401 Unauthorized`: Missing or invalid authentication token
+- `400 Bad Request`: Invalid query parameters
+
+---
+
+#### Get Specific Generated Image
+
+**Endpoint**: `GET /api/images/:id`
+
+**Authentication**: Required
+
+**Description**: Retrieve a specific generated image by ID. Users can only access their own images.
+
+**URL Parameters**:
+- `id` (UUID, required): Image ID
+
+**Success Response** (200 OK):
+```json
+{
+  "image": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "userId": "user_abc123",
+    "imageUrl": "https://storage.supabase.co/v1/object/public/gradients/user123/generated-abc123.png",
+    "storagePath": "user123/generated-abc123.png",
+    "prompt": "Modern SaaS landing page",
+    "style": "tech",
+    "mimeType": "image/png",
+    "mood": "professional",
+    "colorScheme": "blue and purple",
+    "includeText": null,
+    "generatedAt": "2024-01-15T10:30:00.000Z"
+  }
+}
+```
+
+**Error Responses**:
+- `401 Unauthorized`: Missing or invalid authentication token
+- `404 Not Found`: Image not found or doesn't belong to user
+
+---
+
+#### Delete Generated Image
+
+**Endpoint**: `DELETE /api/images/:id`
+
+**Authentication**: Required
+
+**Description**: Delete a generated image. Users can only delete their own images.
+
+**URL Parameters**:
+- `id` (UUID, required): Image ID
+
+**Success Response** (200 OK):
+```json
+{
+  "message": "Image deleted successfully",
+  "deletedImageId": "550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+**Error Responses**:
+- `401 Unauthorized`: Missing or invalid authentication token
+- `404 Not Found`: Image not found or doesn't belong to user
+
+---
+
 #### Get Available Styles
 
 **Endpoint**: `GET /api/images/styles`

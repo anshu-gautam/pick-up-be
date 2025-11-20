@@ -24,10 +24,11 @@ model User {
   updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
-  gradients       Gradient[]
-  conversations   Conversation[]
-  favorites       Favorite[]
-  analyticsEvents AnalyticsEvent[]
+  gradients        Gradient[]
+  conversations    Conversation[]
+  favorites        Favorite[]
+  analyticsEvents  AnalyticsEvent[]
+  generatedImages  GeneratedImage[]
 
   @@map("users")
 }
@@ -130,4 +131,26 @@ model Favorite {
   @@index([userId])
   @@index([gradientId])
   @@map("favorites")
+}
+
+model GeneratedImage {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  prompt      String
+  style       String   @db.VarChar(50)
+  imageUrl    String   @map("image_url")
+  storagePath String   @map("storage_path")
+  mimeType    String   @map("mime_type") @db.VarChar(50)
+  mood        String?  @db.VarChar(100)
+  colorScheme String?  @map("color_scheme") @db.VarChar(200)
+  includeText String?  @map("include_text") @db.VarChar(200)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt(sort: Desc)])
+  @@index([style])
+  @@map("generated_images")
 }

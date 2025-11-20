@@ -3,6 +3,8 @@ import { generateText } from 'ai';
 import { env } from '../config/env';
 import { logger } from '../config/logger';
 import { StorageService } from './storage.service';
+import { GeneratedImageModel } from '../models/generated-image.model';
+import { GeneratedImage } from '../types';
 
 // Hero section image style types
 export type HeroImageStyle =
@@ -23,15 +25,6 @@ export interface GenerateHeroImageRequest {
   includeText?: string;
   mood?: string;
   colorScheme?: string;
-}
-
-export interface GeneratedImage {
-  imageUrl: string;
-  storagePath: string;
-  prompt: string;
-  style: HeroImageStyle;
-  mimeType: string;
-  generatedAt: Date;
 }
 
 export class ImageGenerationService {
@@ -108,14 +101,20 @@ export class ImageGenerationService {
 
       logger.info(`Hero image generated and uploaded: ${storagePath}`);
 
-      return {
-        imageUrl: publicUrl,
-        storagePath,
+      // Save to database
+      const savedImage = await GeneratedImageModel.create({
+        userId,
         prompt: request.prompt,
         style,
+        imageUrl: publicUrl,
+        storagePath,
         mimeType,
-        generatedAt: new Date(),
-      };
+        mood: request.mood,
+        colorScheme: request.colorScheme,
+        includeText: request.includeText,
+      });
+
+      return savedImage;
     } catch (error) {
       logger.error('Error generating hero image:', error);
       throw error;
@@ -219,14 +218,17 @@ export class ImageGenerationService {
 
       logger.info(`Edited image uploaded: ${storagePath}`);
 
-      return {
-        imageUrl: publicUrl,
-        storagePath,
+      // Save to database
+      const savedImage = await GeneratedImageModel.create({
+        userId,
         prompt: editPrompt,
         style: 'abstract',
+        imageUrl: publicUrl,
+        storagePath,
         mimeType,
-        generatedAt: new Date(),
-      };
+      });
+
+      return savedImage;
     } catch (error) {
       logger.error('Error editing image:', error);
       throw error;
