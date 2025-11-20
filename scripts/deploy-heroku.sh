@@ -66,12 +66,10 @@ else
     git push heroku "$BRANCH":main
 fi
 
-# Run migrations
-echo -e "${GREEN}🗄️  Running database migrations...${NC}"
-heroku run npx prisma migrate deploy -a "$APP_NAME" || {
-    echo -e "${YELLOW}Migration failed, trying db push...${NC}"
-    heroku run npx prisma db push -a "$APP_NAME"
-}
+# Note: Database migrations are handled by Supabase
+# If you need to run migrations, do so locally against your Supabase DB:
+# npx prisma migrate deploy
+echo -e "${YELLOW}ℹ️  Skipping migrations (DB is managed by Supabase)${NC}"
 
 # Restart
 echo -e "${GREEN}🔄 Restarting dynos...${NC}"
