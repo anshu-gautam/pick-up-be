@@ -6,16 +6,26 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 // Ensure DATABASE_URL has SSL parameters for Supabase
-const ensureDatabaseUrl = (): string => {
+// Also try to use connection pooling (port 6543) instead of direct (port 5432) for better reliability
+const ensureDatabaseUrl = (usePooling: boolean = false): string => {
   const dbUrl = process.env.DATABASE_URL || '';
   
   if (!dbUrl.includes('supabase.co')) {
     return dbUrl;
   }
   
+  let updatedUrl = dbUrl;
+  
+  // Try to use connection pooling (port 6543) instead of direct (port 5432)
+  // Connection pooling is more reliable for production and has better connection limits
+  if (usePooling && dbUrl.includes(':5432/')) {
+    updatedUrl = dbUrl.replace(':5432/', ':6543/');
+    logger.info('Switching to Supabase connection pooling (port 6543)');
+  }
+  
   // Parse the URL
   try {
-    const url = new URL(dbUrl);
+    const url = new URL(updatedUrl);
     const params = new URLSearchParams(url.search);
     
     // Add SSL parameters if not present
@@ -28,31 +38,38 @@ const ensureDatabaseUrl = (): string => {
       params.set('connect_timeout', '10');
     }
     
+    // Add connection pooling parameters if using pooling
+    if (usePooling && !params.has('pgbouncer')) {
+      params.set('pgbouncer', 'true');
+    }
+    
     // Reconstruct URL with parameters
     url.search = params.toString();
     return url.toString();
   } catch (error) {
     // If URL parsing fails, try simple string manipulation
-    if (!dbUrl.includes('sslmode=')) {
-      const separator = dbUrl.includes('?') ? '&' : '?';
-      return `${dbUrl}${separator}sslmode=require&connect_timeout=10`;
+    if (!updatedUrl.includes('sslmode=')) {
+      const separator = updatedUrl.includes('?') ? '&' : '?';
+      return `${updatedUrl}${separator}sslmode=require&connect_timeout=10`;
     }
-    return dbUrl;
+    return updatedUrl;
   }
 };
 
 // Override DATABASE_URL if needed (must happen before PrismaClient instantiation)
+// Use connection pooling for production (more reliable, better connection limits)
 if (process.env.DATABASE_URL && process.env.DATABASE_URL.includes('supabase.co')) {
-  const updatedUrl = ensureDatabaseUrl();
+  const usePooling = process.env.NODE_ENV === 'production';
+  const updatedUrl = ensureDatabaseUrl(usePooling);
   if (updatedUrl !== process.env.DATABASE_URL) {
     process.env.DATABASE_URL = updatedUrl;
-    logger.info('Updated DATABASE_URL with SSL parameters for Supabase');
+    logger.info(`Updated DATABASE_URL with SSL parameters${usePooling ? ' and connection pooling' : ''} for Supabase`);
   }
 }
 
-// Also ensure DIRECT_URL has SSL if it's a Supabase URL
+// DIRECT_URL should use direct connection (port 5432) for migrations
 if (process.env.DIRECT_URL && process.env.DIRECT_URL.includes('supabase.co')) {
-  const directUrl = ensureDatabaseUrl();
+  const directUrl = ensureDatabaseUrl(false); // Don't use pooling for DIRECT_URL
   if (directUrl !== process.env.DIRECT_URL) {
     process.env.DIRECT_URL = directUrl;
     logger.info('Updated DIRECT_URL with SSL parameters for Supabase');
