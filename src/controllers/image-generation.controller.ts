@@ -260,28 +260,15 @@ export class ImageGenerationController {
 
       logger.info(`Fetching images for user ${userId}, page ${page}, limit ${limit}`);
 
-      let images;
-      let total;
+      let result;
 
       if (style) {
-        images = await GeneratedImageModel.findByStyle(userId, style, page, limit);
-        total = await GeneratedImageModel.countByUserId(userId);
+        result = await GeneratedImageModel.findByStyle(userId, style as any, { page, limit });
       } else {
-        images = await GeneratedImageModel.findByUserId(userId, page, limit);
-        total = await GeneratedImageModel.countByUserId(userId);
+        result = await GeneratedImageModel.findByUserId(userId, { page, limit });
       }
 
-      const totalPages = Math.ceil(total / limit);
-
-      res.json({
-        data: images,
-        pagination: {
-          page,
-          limit,
-          total,
-          totalPages,
-        },
-      });
+      res.json(result);
     } catch (error) {
       logger.error('Error in getUserImages controller:', error);
       throw error;
