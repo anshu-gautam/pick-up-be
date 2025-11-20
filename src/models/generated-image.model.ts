@@ -1,6 +1,7 @@
 import { prisma } from '../config/prisma';
 import { PaginationParams, PaginatedResponse, GeneratedImage, HeroImageStyle } from '../types';
 import { logger } from '../config/logger';
+import { StorageService } from '../services/storage.service';
 
 export interface CreateGeneratedImageInput {
   userId: string;
@@ -34,7 +35,7 @@ export class GeneratedImageModel {
         },
       });
 
-      return this.mapToGeneratedImage(data);
+      return await this.mapToGeneratedImage(data);
     } catch (error) {
       logger.error('Error creating generated image:', error);
       throw error;
@@ -53,7 +54,7 @@ export class GeneratedImageModel {
         },
       });
 
-      return image ? this.mapToGeneratedImage(image) : null;
+      return image ? await this.mapToGeneratedImage(image) : null;
     } catch (error) {
       logger.error('Error finding generated image:', error);
       throw error;
@@ -84,8 +85,11 @@ export class GeneratedImageModel {
         prisma.generatedImage.count({ where: { userId } }),
       ]);
 
+      // Generate fresh signed URLs for all images
+      const mappedImages = await Promise.all(images.map((img: any) => this.mapToGeneratedImage(img)));
+
       return {
-        data: images.map(this.mapToGeneratedImage),
+        data: mappedImages,
         pagination: {
           page,
           limit,
@@ -122,8 +126,11 @@ export class GeneratedImageModel {
         prisma.generatedImage.count({ where: { userId, style } }),
       ]);
 
+      // Generate fresh signed URLs for all images
+      const mappedImages = await Promise.all(images.map((img: any) => this.mapToGeneratedImage(img)));
+
       return {
-        data: images.map(this.mapToGeneratedImage),
+        data: mappedImages,
         pagination: {
           page,
           limit,
@@ -193,15 +200,18 @@ export class GeneratedImageModel {
   }
 
   /**
-   * Map database record to GeneratedImage type
+   * Map database record to GeneratedImage type with fresh signed URL
    */
-  private static mapToGeneratedImage(data: any): GeneratedImage {
+  private static async mapToGeneratedImage(data: any): Promise<GeneratedImage> {
+    // Generate fresh signed URL from storage path
+    const freshSignedUrl = await StorageService.getPublicUrl(data.storagePath);
+
     return {
       id: data.id,
       userId: data.userId,
       prompt: data.prompt,
       style: data.style as HeroImageStyle,
-      imageUrl: data.imageUrl,
+      imageUrl: freshSignedUrl, // Use fresh signed URL instead of stored one
       storagePath: data.storagePath,
       mimeType: data.mimeType,
       mood: data.mood,

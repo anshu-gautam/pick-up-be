@@ -12,7 +12,7 @@ export class StorageService {
    * @param imageBuffer - Image buffer (PNG/SVG)
    * @param format - Image format (png/svg)
    * @param gradientId - Optional gradient ID for filename
-   * @returns Public URL and storage path
+   * @returns Signed URL (valid for 1 hour) and storage path
    */
   static async uploadGradientImage(
     userId: string,
@@ -37,12 +37,20 @@ export class StorageService {
         throw uploadError;
       }
 
-      const { data } = supabase.storage.from(this.bucket).getPublicUrl(storagePath);
+      // Generate signed URL (valid for 1 hour)
+      const { data: signedData, error: signedError } = await supabase.storage
+        .from(this.bucket)
+        .createSignedUrl(storagePath, 3600); // 3600 seconds = 1 hour
+
+      if (signedError || !signedData) {
+        logger.error('Error creating signed URL:', signedError);
+        throw signedError || new Error('Failed to create signed URL');
+      }
 
       logger.info(`Uploaded gradient image: ${storagePath}`);
 
       return {
-        publicUrl: data.publicUrl,
+        publicUrl: signedData.signedUrl,
         storagePath,
       };
     } catch (error) {
@@ -52,13 +60,21 @@ export class StorageService {
   }
 
   /**
-   * Get public URL for a stored gradient image
+   * Get signed URL for a stored gradient image
    * @param storagePath - Storage path of the image
-   * @returns Public URL
+   * @returns Signed URL (valid for 1 hour)
    */
-  static getPublicUrl(storagePath: string): string {
-    const { data } = supabase.storage.from(this.bucket).getPublicUrl(storagePath);
-    return data.publicUrl;
+  static async getPublicUrl(storagePath: string): Promise<string> {
+    const { data, error } = await supabase.storage
+      .from(this.bucket)
+      .createSignedUrl(storagePath, 3600); // 3600 seconds = 1 hour
+
+    if (error || !data) {
+      logger.error('Error creating signed URL:', error);
+      throw error || new Error('Failed to create signed URL');
+    }
+
+    return data.signedUrl;
   }
 
   /**
@@ -151,7 +167,7 @@ export class StorageService {
 
       if (!exists) {
         const { error } = await supabase.storage.createBucket(this.bucket, {
-          public: true,
+          public: false, // Private bucket - use signed URLs for access
           fileSizeLimit: 10485760, // 10MB
           allowedMimeTypes: ['image/png', 'image/svg+xml'],
         });
@@ -161,7 +177,7 @@ export class StorageService {
           throw error;
         }
 
-        logger.info(`Created storage bucket: ${this.bucket}`);
+        logger.info(`Created private storage bucket: ${this.bucket}`);
       }
     } catch (error) {
       logger.error('Failed to initialize storage bucket:', error);
