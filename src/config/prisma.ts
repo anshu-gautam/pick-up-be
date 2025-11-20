@@ -5,6 +5,28 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
+// Ensure DATABASE_URL has SSL parameters for Supabase
+const ensureDatabaseUrl = (): string => {
+  const dbUrl = process.env.DATABASE_URL || '';
+  
+  // If it's a Supabase URL and doesn't have SSL parameters, add them
+  if (dbUrl.includes('supabase.co') && !dbUrl.includes('sslmode=')) {
+    const separator = dbUrl.includes('?') ? '&' : '?';
+    return `${dbUrl}${separator}sslmode=require`;
+  }
+  
+  return dbUrl;
+};
+
+// Override DATABASE_URL if needed
+if (process.env.DATABASE_URL && process.env.DATABASE_URL.includes('supabase.co')) {
+  const updatedUrl = ensureDatabaseUrl();
+  if (updatedUrl !== process.env.DATABASE_URL) {
+    process.env.DATABASE_URL = updatedUrl;
+    logger.info('Updated DATABASE_URL with SSL parameters for Supabase');
+  }
+}
+
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
