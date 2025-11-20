@@ -1,5 +1,6 @@
 import { prisma } from '../config/prisma';
-import { UserProfile, UserStats, PrismaTypes } from '../types';
+import { UserProfile, UserStats } from '../types';
+import { Prisma } from '@prisma/client';
 import { logger } from '../config/logger';
 
 export class UserModel {
@@ -51,12 +52,12 @@ export class UserModel {
     updates: Partial<UserProfile>
   ): Promise<UserProfile> {
     try {
-      const updateData: PrismaTypes.UserUpdateInput = {};
+      const updateData: Prisma.UserUpdateInput = {};
 
       if (updates.name !== undefined) updateData.name = updates.name;
       if (updates.email !== undefined) updateData.email = updates.email;
       if (updates.preferences !== undefined) {
-        updateData.preferences = updates.preferences as PrismaTypes.InputJsonValue;
+        updateData.preferences = updates.preferences as Prisma.InputJsonValue;
       }
 
       const user = await prisma.user.update({

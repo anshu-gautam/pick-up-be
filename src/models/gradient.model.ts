@@ -1,5 +1,6 @@
 import { prisma } from '../config/prisma';
-import { Gradient, PaginationParams, PaginatedResponse, ColorStop, PrismaTypes } from '../types';
+import { Gradient, PaginationParams, PaginatedResponse, ColorStop } from '../types';
+import { Prisma } from '@prisma/client';
 import { logger } from '../config/logger';
 
 export class GradientModel {
@@ -11,7 +12,7 @@ export class GradientModel {
           name: gradient.name,
           type: gradient.type,
           angle: gradient.angle,
-          colorStops: gradient.colorStops as unknown as PrismaTypes.InputJsonValue,
+          colorStops: gradient.colorStops as unknown as Prisma.InputJsonValue,
           accessibilityScore: gradient.accessibilityScore,
           tags: gradient.tags || [],
           isPublic: gradient.isPublic || false,
@@ -120,13 +121,13 @@ export class GradientModel {
 
   static async update(id: string, userId: string, updates: Partial<Gradient>): Promise<Gradient> {
     try {
-      const updateData: PrismaTypes.GradientUpdateInput = {};
+      const updateData: Prisma.GradientUpdateInput = {};
 
       if (updates.name !== undefined) updateData.name = updates.name;
       if (updates.type !== undefined) updateData.type = updates.type;
       if (updates.angle !== undefined) updateData.angle = updates.angle;
       if (updates.colorStops !== undefined) {
-        updateData.colorStops = updates.colorStops as unknown as PrismaTypes.InputJsonValue;
+        updateData.colorStops = updates.colorStops as unknown as Prisma.InputJsonValue;
       }
       if (updates.accessibilityScore !== undefined) {
         updateData.accessibilityScore = updates.accessibilityScore;
